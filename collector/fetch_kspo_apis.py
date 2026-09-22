@@ -35,8 +35,8 @@ OUTPUT_DIR = os.path.join(SCRIPT_DIR, "collector")
 # ============================================================
 APIS = [
     {
-        "name": "kspo_lecture_info",  # -> collector/kspo_facilities.json
-        "endpoint": "https://apis.data.go.kr/B551014/SRVC_OD_API_FACIL_COURSE/todz_api_facil_course_i",
+        "name": "kspo_health_video_ALL_LIST",  # -> collector/kspo_facilities.json
+        "endpoint": "https://apis.data.go.kr/B551014/SRVC_TODZ_VDO_PKG/TODZ_VDO_VIEW_ALL_LIST_I",
         "extra_params": {},  # city_cd, local_cd, main_event_cd 등은 필수 아니라 비워둠
     },
     # {
