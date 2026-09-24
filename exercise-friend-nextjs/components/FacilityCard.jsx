@@ -1,24 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { sportEmoji, getAccessibilityInfo, submitAccessibility } from "../lib/logic";
-
-function ReviewBlock({ f }) {
-  // "rv" 필드는 지금은 비어있음. 나중에 네이버/카카오맵 후기를 크롤링한
-  // 데이터를 {avg, count, top:[...]} 형태로 f.rv 에 채워주면 자동으로
-  // 별점 + 후기 문구가 나타남. 지금은 데이터가 없으니 아무것도 표시 안 함.
-  if (!f.rv) return null;
-  const full = Math.max(0, Math.min(5, Math.round(f.rv.avg)));
-  const starStr = "★".repeat(full) + "☆".repeat(5 - full);
-  const snippets = (f.rv.top || []).slice(0, 2).map((s) => `“${s}”`).join(" · ");
-  return (
-    <div className="review-block">
-      <span className="stars">{starStr}</span> <b>{f.rv.avg.toFixed(1)}</b>{" "}
-      <span className="course-meta">({f.rv.count}개 후기)</span>
-      {snippets ? <p className="review-snippet">{snippets}</p> : null}
-    </div>
-  );
-}
+import { sportEmoji, getAccessibilityInfo, submitAccessibility, facilityKey } from "../lib/logic";
+import FacilityReviews from "./FacilityReviews";
+import BookingRequest from "./BookingRequest";
 
 function AccessibilityBlock({ f }) {
   const [info, setInfo] = useState(null);
@@ -94,15 +79,9 @@ export default function FacilityCard({ f }) {
       ) : (
         <p className="no-course-note">현재 등록된 강좌 신청 정보는 없어요. 시설에 직접 문의해보세요.</p>
       )}
-      <ReviewBlock f={f} />
+      <FacilityReviews facilityKey={facilityKey(f)} facilityName={f.n} />
       <AccessibilityBlock f={f} />
-      <button
-        className="btn-outline"
-        type="button"
-        onClick={() => alert("문의/예약 기능은 다음 단계에서 연결할 예정이에요!")}
-      >
-        문의 / 예약하기
-      </button>
+      <BookingRequest facilityName={f.n} facilityAddr={f.a} courseName={c && c.n ? c.n : ""} />
     </div>
   );
 }
