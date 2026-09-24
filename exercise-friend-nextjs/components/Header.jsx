@@ -1,0 +1,55 @@
+"use client";
+
+function TigerMark() {
+  return (
+    <svg
+      width="30"
+      height="30"
+      viewBox="0 0 100 100"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      style={{ flexShrink: 0 }}
+    >
+      {/* 귀 */}
+      <circle cx="22" cy="24" r="14" fill="#111111" />
+      <circle cx="78" cy="24" r="14" fill="#111111" />
+      <circle cx="22" cy="24" r="6.5" fill="#ffffff" />
+      <circle cx="78" cy="24" r="6.5" fill="#ffffff" />
+      {/* 얼굴 */}
+      <circle cx="50" cy="56" r="38" fill="#ffffff" stroke="#111111" strokeWidth="4" />
+      {/* 눈썹 줄무늬 */}
+      <path d="M18 42 Q28 30 40 40" stroke="#111111" strokeWidth="4.5" fill="none" strokeLinecap="round" />
+      <path d="M82 42 Q72 30 60 40" stroke="#111111" strokeWidth="4.5" fill="none" strokeLinecap="round" />
+      {/* 눈 */}
+      <circle cx="36" cy="54" r="4.2" fill="#111111" />
+      <circle cx="64" cy="54" r="4.2" fill="#111111" />
+      {/* 코 */}
+      <path d="M45 64 L55 64 L50 71 Z" fill="#111111" />
+      {/* 입 */}
+      <path d="M50 71 Q42 80 32 75" stroke="#111111" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M50 71 Q58 80 68 75" stroke="#111111" strokeWidth="3" fill="none" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export default function Header({ title, showSearch, query, onQueryChange }) {
+  return (
+    <header className="site-header">
+      <div className="site-header-inner">
+        <span className="site-title">
+          <TigerMark />
+          {title}
+        </span>
+        {showSearch ? (
+          <input
+            className="site-search-input"
+            type="text"
+            placeholder="시설, 종목, 지역으로 검색"
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+          />
+        ) : null}
+      </div>
+    </header>
+  );
+}
