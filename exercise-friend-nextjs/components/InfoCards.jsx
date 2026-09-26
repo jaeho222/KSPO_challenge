@@ -1,3 +1,8 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { getBaselineDifficulty, getCertBasedDifficulty } from "../lib/logic";
+
 export function EquityCard({ eq, regionName }) {
   const belowAvg = eq.myCnt < eq.avgCnt;
   const comment = belowAvg
@@ -47,7 +52,19 @@ export function RoutineCard({ routine }) {
   );
 }
 
-export function FitnessRefCard({ data, diff }) {
+export function FitnessRefCard({ data, gender, age, painAreas, fitnessStandards }) {
+  const [diffInfo, setDiffInfo] = useState(null);
+
+  useEffect(() => {
+    const certBased = getCertBasedDifficulty(fitnessStandards, gender, age);
+    if (certBased) {
+      setDiffInfo({ source: "cert", label: certBased.label, count: certBased.count });
+    } else {
+      setDiffInfo({ source: "baseline", label: getBaselineDifficulty(painAreas) });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gender, age, painAreas]);
+
   const g = {};
   data.grades.forEach((r) => (g[r.grade] = r.value));
   return (
@@ -61,9 +78,19 @@ export function FitnessRefCard({ data, diff }) {
         <br />
         3등급 {g["3등급"] || "-"} · 2등급 {g["2등급"] || "-"} · 1등급 {g["1등급"] || "-"}
       </div>
-      <p className="ref-hint">
-        답변하신 운동 빈도를 보면 <b>{diff}</b> 난이도 프로그램부터 시작하는 걸 추천드려요.
-      </p>
+      {diffInfo ? (
+        diffInfo.source === "cert" ? (
+          <p className="ref-hint">
+            체력인증 도전과제에서 실제 기록하신 결과({diffInfo.count}개 항목)를 보면, <b>{diffInfo.label}</b> 난이도
+            프로그램이 잘 맞아요.
+          </p>
+        ) : (
+          <p className="ref-hint">
+            지금은 <b>{diffInfo.label}</b> 난이도부터 시작해보는 걸 추천드려요. 마이페이지의 <b>국민체력100 도전과제</b>
+            에서 실제 기록을 입력하면 더 정확하게 알려드려요!
+          </p>
+        )
+      ) : null}
     </div>
   );
 }

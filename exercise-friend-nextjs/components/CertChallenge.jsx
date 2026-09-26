@@ -6,7 +6,6 @@ import {
   findCertVideo,
   getCertLevel,
   setCertLevel,
-  submitCertRecord,
   AGE_TO_FITNESS,
 } from "../lib/logic";
 
@@ -46,17 +45,37 @@ export default function CertChallenge({ fitnessStandards, certVideos, gender, ag
     const sex = gender === "여성" ? "여" : "남";
 
     setSubmitting((prev) => ({ ...prev, [item.name]: true }));
-    const result = bracket
-      ? await submitCertRecord({
-          item: item.name,
-          stage: bracket.stage,
-          range: bracket.range,
-          sex,
-          region: regionKey || "",
-          value: val,
-          direction: item.direction,
-        })
-      : null;
+    let result = null;
+    if (bracket) {
+      try {
+        const res = await fetch("/api/cert-records", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            item: item.name,
+            stage: bracket.stage,
+            range: bracket.range,
+            sex,
+            region: regionKey || "",
+            value: val,
+            direction: item.direction,
+            thresholds: item.thresholds,
+          }),
+        });
+        if (res.ok) {
+          result = await res.json();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          setSubmitting((prev) => ({ ...prev, [item.name]: false }));
+          alert(err.error || "기록 제출에 실패했어요.");
+          return;
+        }
+      } catch (e) {
+        setSubmitting((prev) => ({ ...prev, [item.name]: false }));
+        alert("기록 제출에 실패했어요. 네트워크를 확인해주세요.");
+        return;
+      }
+    }
     setSubmitting((prev) => ({ ...prev, [item.name]: false }));
     if (result) {
       setPercentiles((prev) => ({ ...prev, [item.name]: result }));

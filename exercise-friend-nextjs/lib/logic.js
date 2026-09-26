@@ -75,14 +75,30 @@ export function findFitnessRef(fitnessStandards, genderLabel, ageLabel) {
     .sort((a, b) => a.grade.localeCompare(b.grade));
   return { stage: map.stage, range: map.range, sex, item, grades };
 }
-export function difficultyFromActivity(activityLabel) {
-  const table = {
-    "거의 하지 않아요": "입문",
-    "가끔, 산책 정도예요": "초급",
-    "주 1~2회 정도 해요": "중급",
-    "주 3회 이상 꾸준히 해요": "중상급",
-  };
-  return table[activityLabel] || "초급";
+// ============================================================
+// 난이도 추천 (하이브리드 방식)
+// - 체력인증 도전과제에서 실제 기록이 하나라도 있으면 그걸로 (정확)
+// - 아직 없으면 "통증 부위 있음/없음" 답변으로 대충 추정 (즉시 가능)
+// ------------------------------------------------------------
+export function getBaselineDifficulty(painAreas) {
+  const hasPain = (painAreas || []).some((p) => p !== "특별히 없음");
+  return hasPain ? "입문" : "중급";
+}
+
+const GRADE_RANK = { "1등급": 3, "2등급": 2, "3등급": 1 };
+const GRADE_TO_LABEL = { "1등급": "상급", "2등급": "중급", "3등급": "입문" };
+
+export function getCertBasedDifficulty(fitnessStandards, genderLabel, ageLabel) {
+  const items = getFitnessItemDetails(fitnessStandards, genderLabel, ageLabel);
+  const achievedGrades = items
+    .map((it) => {
+      const level = getCertLevel(it.name);
+      return level >= 0 ? it.levels[level] : null;
+    })
+    .filter(Boolean);
+  if (!achievedGrades.length) return null;
+  const best = achievedGrades.reduce((a, b) => (GRADE_RANK[b] > GRADE_RANK[a] ? b : a));
+  return { grade: best, label: GRADE_TO_LABEL[best] || "중급", count: achievedGrades.length };
 }
 
 // ============================================================
@@ -103,18 +119,13 @@ const AGE_GROUP_MAP = {
   "10대": ["청소년", "공통"], "20대": ["공통"], "30대": ["공통"], "40대": ["공통"],
   "50대": ["공통", "어르신"], "60대": ["어르신", "공통"], "70대 이상": ["어르신", "공통"],
 };
-const PLACE_MATCH = {
-  헬스장에서: ["헬스장"], "집에서 간단히": ["실내"], 야외에서: ["실외", "운동장"],
-};
-export function getGuideVideos(guideVideos, goals, ageLabel, placePref) {
+export function getGuideVideos(guideVideos, goals, ageLabel) {
   if (!goals || !goals.length) return [];
   const allowedGrp = AGE_GROUP_MAP[ageLabel] || ["공통"];
-  const placeTokens = PLACE_MATCH[placePref];
   return guideVideos
     .filter((v) => {
       if (!goals.includes(v.b)) return false;
       if (!allowedGrp.includes(v.grp)) return false;
-      if (placeTokens && !placeTokens.some((t) => v.p.includes(t))) return false;
       return true;
     })
     .slice(0, 4);
@@ -261,28 +272,6 @@ function safeSetItem(key, value) {
 export function facilityKey(f) {
   return `${f.n}|${f.a}`;
 }
-export function getAccessibilityInfo(f) {
-  const raw = safeGetItem(`a11y:${facilityKey(f)}`);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch (e) {
-    return null;
-  }
-}
-export function submitAccessibility(f, inputText) {
-  const tags = (inputText || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .slice(0, 5);
-  if (!tags.length) return null;
-  const existing = getAccessibilityInfo(f) || { tags: [], count: 0 };
-  const mergedTags = Array.from(new Set(existing.tags.concat(tags))).slice(0, 6);
-  const updated = { tags: mergedTags, count: existing.count + 1 };
-  safeSetItem(`a11y:${facilityKey(f)}`, JSON.stringify(updated));
-  return updated;
-}
 
 export function getCertLevel(name) {
   const raw = safeGetItem(`cert-level:${name}`);
@@ -295,24 +284,41 @@ export function setCertLevel(name, level) {
 }
 
 // ============================================================
-// 게임 요소: 실제로 입력된 기록들과 비교한 "진짜" 순위
-// 사용자가 입력한 값을 서버에 실제로 저장하고, 지금까지 쌓인
-// 다른 사람들의 기록과 비교해서 상위 몇 %인지 계산해줌.
-// (지역 표본이 너무 적으면 local이 null로 와서 안전하게 숨김)
+// 온보딩 중간저장
+// 비유: 게임 중간 저장(세이브포인트) 같은 거야. 9단계 설문 도중
+// 브라우저를 닫아도, 다음에 다시 오면 "이어서 할래요?" 하고 물어봄.
 // ------------------------------------------------------------
-export async function submitCertRecord(payload) {
+const ONBOARDING_KEY = "ef-onboarding-progress";
+export function saveOnboardingProgress(state) {
   try {
-    const res = await fetch("/api/cert-records", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) return null;
-    return await res.json();
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(ONBOARDING_KEY, JSON.stringify(state));
   } catch (e) {
-    return null; // 네트워크 문제 등으로 실패해도 앱이 멈추지 않게
+    /* 저장 실패해도 앱은 계속 동작해야 하므로 무시 */
   }
 }
+export function loadOnboardingProgress() {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(ONBOARDING_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+export function clearOnboardingProgress() {
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem(ONBOARDING_KEY);
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+// ============================================================
+// (참고) 국민체력100 기록 제출은 이제 components/CertChallenge.jsx에서
+// 서버 응답 에러 메시지를 직접 다루기 위해 fetch를 인라인으로 호출함.
+// ------------------------------------------------------------
 
 // ============================================================
 // 전국 시설 검색 (지역명 / 종목명 / 시설명을 자유롭게 조합해서 검색)

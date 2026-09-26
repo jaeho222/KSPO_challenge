@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 
-export default function BookingRequest({ facilityName, facilityAddr, courseName }) {
+export default function BookingRequest({ facilityKey, facilityName, facilityAddr, courseName }) {
   const [open, setOpen] = useState(false);
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -14,12 +15,16 @@ export default function BookingRequest({ facilityName, facilityAddr, courseName 
       alert("연락처를 정확히 입력해주세요. (예: 010-1234-5678)");
       return;
     }
+    if (!agreed) {
+      alert("개인정보 수집·이용에 동의해주셔야 신청이 가능해요.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/booking-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ facilityName, facilityAddr, courseName, phone, message }),
+        body: JSON.stringify({ facilityKey, facilityName, facilityAddr, courseName, phone, message }),
       });
       if (res.ok) {
         setDone(true);
@@ -69,6 +74,13 @@ export default function BookingRequest({ facilityName, facilityAddr, courseName 
         value={message}
         onChange={(e) => setMessage(e.target.value)}
       />
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 6, marginBottom: 10, fontSize: 12.5, color: "var(--muted)" }}>
+        <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 2 }} />
+        <span>
+          [필수] 예약 신청 확인 및 시설 연락 목적으로 연락처를 수집하며, 처리 완료 후 30일 이내 파기합니다. 수집한
+          정보는 해당 시설과의 예약 확인 외 다른 목적으로 사용하지 않습니다.
+        </span>
+      </label>
       <div style={{ display: "flex", gap: 8 }}>
         <button className="btn-outline" type="button" onClick={handleSubmit} disabled={submitting}>
           {submitting ? "신청 중..." : "신청하기"}

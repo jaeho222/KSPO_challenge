@@ -1,52 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { sportEmoji, getAccessibilityInfo, submitAccessibility, facilityKey } from "../lib/logic";
+import { sportEmoji, facilityKey } from "../lib/logic";
 import FacilityReviews from "./FacilityReviews";
 import BookingRequest from "./BookingRequest";
-
-function AccessibilityBlock({ f }) {
-  const [info, setInfo] = useState(null);
-
-  useEffect(() => {
-    setInfo(getAccessibilityInfo(f));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [f.n, f.a]);
-
-  function handleSubmit() {
-    const input = window.prompt(
-      "이 시설의 접근성 정보를 알려주세요 (쉼표로 구분)\n예: 휠체어 진입 가능, 경사로 있음, 엘리베이터 있음"
-    );
-    if (!input) return;
-    const updated = submitAccessibility(f, input);
-    if (updated) setInfo(updated);
-  }
-
-  if (info && info.tags.length) {
-    return (
-      <div className="review-block">
-        <p style={{ margin: "0 0 6px", fontSize: "12.5px", color: "var(--muted)" }}>
-          ♿ 접근성 제보 {info.count}건
-        </p>
-        {info.tags.map((t) => (
-          <span className="sport-badge" key={t}>
-            {t}
-          </span>
-        ))}
-      </div>
-    );
-  }
-  return (
-    <div className="review-block">
-      <p style={{ margin: "0 0 6px", fontSize: "12.5px", color: "var(--muted)" }}>
-        아직 등록된 접근성 정보가 없어요.
-      </p>
-      <button className="btn-outline" type="button" onClick={handleSubmit}>
-        ♿ 접근성 정보 제보하기
-      </button>
-    </div>
-  );
-}
 
 export default function FacilityCard({ f }) {
   const c = f.c;
@@ -79,9 +35,14 @@ export default function FacilityCard({ f }) {
       ) : (
         <p className="no-course-note">현재 등록된 강좌 신청 정보는 없어요. 시설에 직접 문의해보세요.</p>
       )}
+      {/* 접근성 정보는 이제 후기 작성 시 함께 남기는 태그로 통합됨 (FacilityReviews 안에서 처리) */}
       <FacilityReviews facilityKey={facilityKey(f)} facilityName={f.n} />
-      <AccessibilityBlock f={f} />
-      <BookingRequest facilityName={f.n} facilityAddr={f.a} courseName={c && c.n ? c.n : ""} />
+      <BookingRequest
+        facilityKey={facilityKey(f)}
+        facilityName={f.n}
+        facilityAddr={f.a}
+        courseName={c && c.n ? c.n : ""}
+      />
     </div>
   );
 }

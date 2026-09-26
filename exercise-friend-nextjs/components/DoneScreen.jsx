@@ -18,16 +18,10 @@ export default function DoneScreen({ answers, onRestart, onGoToResults }) {
           연령대 &nbsp; <b>{answers.age || "-"}</b>
         </div>
         <div>
-          운동 빈도 &nbsp; <b>{answers.activity || "-"}</b>
-        </div>
-        <div>
           불편한 부위 &nbsp; <b>{painText}</b>
         </div>
         <div>
           운동 목적 &nbsp; <b>{goalsText}</b>
-        </div>
-        <div>
-          선호 장소 &nbsp; <b>{answers.placePref || "-"}</b>
         </div>
         <div>
           장애인 정보 &nbsp; <b>{answers.disabilityInterest || "-"}</b>

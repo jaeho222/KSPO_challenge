@@ -2,16 +2,21 @@
 
 import { useEffect, useState } from "react";
 
+const TAG_OPTIONS = ["휠체어 진입 가능", "경사로 있음", "엘리베이터 있음", "장애인 화장실 있음"];
+
 export default function FacilityReviews({ facilityKey, facilityName }) {
   const [reviews, setReviews] = useState([]);
   const [avg, setAvg] = useState(null);
   const [count, setCount] = useState(0);
+  const [tagSummary, setTagSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [rating, setRating] = useState(0);
   const [text, setText] = useState("");
+  const [selectedTags, setSelectedTags] = useState([]);
   const [photoFile, setPhotoFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [reportedIds, setReportedIds] = useState(() => new Set());
 
   async function loadReviews() {
     try {
@@ -21,6 +26,7 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
       setReviews(data.reviews || []);
       setAvg(data.avg);
       setCount(data.count || 0);
+      setTagSummary(data.tagSummary || []);
     } catch (e) {
       /* 조용히 무시: 후기 로딩 실패해도 나머지 화면은 정상 동작 */
     } finally {
@@ -33,6 +39,18 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facilityKey]);
 
+  function handleReport(reviewId) {
+    if (reportedIds.has(reviewId)) return;
+    const ok = window.confirm("이 후기를 신고하시겠어요? 부적절한 내용(욕설, 광고, 사생활 침해 등)일 때 이용해주세요.");
+    if (!ok) return;
+    // TODO(백엔드): 신고 접수 API가 만들어지면 여기서 실제로 POST 요청을 보내야 함.
+    setReportedIds((prev) => new Set(prev).add(reviewId));
+  }
+
+  function toggleTag(tag) {
+    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  }
+
   async function handleSubmit() {
     if (!rating) {
       alert("별점을 먼저 선택해주세요.");
@@ -44,6 +62,7 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
     form.append("facilityName", facilityName);
     form.append("rating", String(rating));
     form.append("text", text);
+    selectedTags.forEach((t) => form.append("tags", t));
     if (photoFile) form.append("photo", photoFile);
 
     try {
@@ -51,15 +70,17 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
       if (res.ok) {
         setText("");
         setRating(0);
+        setSelectedTags([]);
         setPhotoFile(null);
         setShowForm(false);
         await loadReviews();
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(err.error === "file too large (max 5MB)" ? "사진 용량이 너무 커요 (5MB 이하로 올려주세요)." : "후기 등록에 실패했어요.");
+        // 서버가 보내준 구체적인 이유를 그대로 보여줘서, 문제가 생겨도 바로 원인을 알 수 있게 함
+        alert(err.error || "후기 등록에 실패했어요. (알 수 없는 오류)");
       }
     } catch (e) {
-      alert("후기 등록에 실패했어요. 다시 시도해주세요.");
+      alert("후기 등록에 실패했어요. 네트워크 연결을 확인해주세요.");
     } finally {
       setSubmitting(false);
     }
@@ -67,6 +88,20 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
 
   return (
     <div className="review-block">
+      {/* 접근성 정보: 여러 후기에서 언급된 걸 모아서 맨 위에 한눈에 보이게 표시 */}
+      {tagSummary.length ? (
+        <div className="access-summary">
+          ♿{" "}
+          {tagSummary.map((t, i) => (
+            <span key={t.tag}>
+              {i > 0 ? " · " : ""}
+              {t.tag}
+              {t.count > 1 ? `(${t.count}건)` : ""}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
       {loading ? (
         <p className="review-snippet">후기 불러오는 중...</p>
       ) : count > 0 ? (
@@ -87,6 +122,15 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
                 </span>{" "}
                 {r.text}
               </p>
+              {r.tags && r.tags.length ? (
+                <div style={{ marginTop: 4 }}>
+                  {r.tags.map((t) => (
+                    <span className="sport-badge" key={t} style={{ fontSize: 11 }}>
+                      ♿ {t}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               {r.photoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -95,6 +139,23 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
                   style={{ maxWidth: "100%", borderRadius: 8, marginTop: 4, display: "block" }}
                 />
               ) : null}
+              <button
+                type="button"
+                onClick={() => handleReport(r.id)}
+                disabled={reportedIds.has(r.id)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--muted)",
+                  fontSize: 11.5,
+                  textDecoration: reportedIds.has(r.id) ? "none" : "underline",
+                  cursor: reportedIds.has(r.id) ? "default" : "pointer",
+                  padding: 0,
+                  marginTop: 4,
+                }}
+              >
+                {reportedIds.has(r.id) ? "신고 접수됨" : "🚩 신고하기"}
+              </button>
             </div>
           ))}
           {count > 3 ? <p className="more-text">외 {count - 3}개 후기 더보기</p> : null}
@@ -125,6 +186,30 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
+          <p className="hint" style={{ margin: "0 0 6px" }}>
+            해당되는 게 있으면 체크해주세요 (선택)
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+            {TAG_OPTIONS.map((tag) => (
+              <label
+                key={tag}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 12.5,
+                  color: "var(--muted)",
+                  border: "1px solid var(--line)",
+                  borderRadius: 999,
+                  padding: "5px 10px",
+                  cursor: "pointer",
+                }}
+              >
+                <input type="checkbox" checked={selectedTags.includes(tag)} onChange={() => toggleTag(tag)} />
+                {tag}
+              </label>
+            ))}
+          </div>
           <input
             type="file"
             accept="image/*"

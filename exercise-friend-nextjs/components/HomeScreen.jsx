@@ -3,7 +3,6 @@
 import {
   findRegionKey,
   findFitnessRef,
-  difficultyFromActivity,
   getRehabVideos,
   getGuideVideos,
   getDisableFacilities,
@@ -12,6 +11,8 @@ import {
   sportEmoji,
 } from "../lib/logic";
 import { EquityCard, RoutineCard, FitnessRefCard } from "./InfoCards";
+import CalendarWidget from "./CalendarWidget";
+import CollapsibleSection from "./CollapsibleSection";
 import VideoCard from "./VideoCard";
 import FacilityCard, { DisableFacilityCard } from "./FacilityCard";
 
@@ -28,9 +29,8 @@ export default function HomeScreen({ data, answers }) {
   }
 
   const fitnessRef = findFitnessRef(data.fitness, answers.gender, answers.age);
-  const diff = difficultyFromActivity(answers.activity);
   const rehabVideos = getRehabVideos(data.mscl, answers.painAreas);
-  const guideVideos = getGuideVideos(data.guide, answers.goals, answers.age, answers.placePref);
+  const guideVideos = getGuideVideos(data.guide, answers.goals, answers.age);
   const wantsDisable = answers.disabilityInterest === "예";
   const disableInfo = wantsDisable
     ? getDisableFacilities(data.disable, regionKey, interests)
@@ -50,32 +50,56 @@ export default function HomeScreen({ data, answers }) {
         ))}
       </div>
 
+      {/* 항상 바로 보이는 핵심 위젯 (작고 한눈에 들어오는 것들만) */}
+      {regionKey ? <CalendarWidget data={data} answers={answers} /> : null}
+
+      {/* 형평성 지수는 서비스 핵심 차별점이라 접지 않고 바로 보여줌 */}
       {equity ? <EquityCard eq={equity} regionName={answers.region || regionKey} /> : null}
-      {routine ? <RoutineCard routine={routine} /> : null}
-      {fitnessRef ? <FitnessRefCard data={fitnessRef} diff={diff} /> : null}
+
+      {/* 나머지 보조 정보는 접어두고, 필요할 때만 펼쳐보게 함 (한 화면 정보 과밀 방지) */}
+      {routine ? (
+        <CollapsibleSection title="🗓️ 이번 주 표준 운동 루틴" subtitle={`${routine.grp} · ${routine.weekLabel}`}>
+          <RoutineCard routine={routine} />
+        </CollapsibleSection>
+      ) : null}
+
+      {fitnessRef ? (
+        <CollapsibleSection title="📊 국민체력100 참고 정보" subtitle="내 연령대 기준 보기">
+          <FitnessRefCard
+            data={fitnessRef}
+            gender={answers.gender}
+            age={answers.age}
+            painAreas={answers.painAreas}
+            fitnessStandards={data.fitness}
+          />
+        </CollapsibleSection>
+      ) : null}
 
       {rehabVideos.length ? (
-        <>
-          <p className="section-title">🧘 통증 완화에 도움되는 스트레칭</p>
+        <CollapsibleSection
+          title="🧘 통증 완화 스트레칭"
+          subtitle={`${rehabVideos.length}개 영상`}
+          defaultOpen // 통증 부위를 직접 선택했을 만큼 관련도가 높아서 기본으로 펼쳐둠
+        >
           <div className="facility-list">
             {rehabVideos.map((v, i) => (
               <VideoCard key={i} title={v.n} desc={v.d} tags={[v.part, v.step]} />
             ))}
           </div>
-        </>
+        </CollapsibleSection>
       ) : null}
 
       {guideVideos.length ? (
-        <>
-          <p className="section-title">🎯 목적에 맞는 운동 가이드</p>
+        <CollapsibleSection title="🎯 목적에 맞는 운동 가이드" subtitle={`${guideVideos.length}개 영상`}>
           <div className="facility-list">
             {guideVideos.map((v, i) => (
               <VideoCard key={i} title={v.n} desc={v.d} tags={[v.lv, v.p]} />
             ))}
           </div>
-        </>
+        </CollapsibleSection>
       ) : null}
 
+      {/* 서비스의 핵심 목적이라 기본으로 펼쳐둠 */}
       <p className="section-title">🏟️ 우리 동네 프로그램 ({matched.length}곳)</p>
       {note ? (
         <p className="hint" style={{ marginBottom: 12 }}>
@@ -93,8 +117,11 @@ export default function HomeScreen({ data, answers }) {
       </div>
 
       {wantsDisable ? (
-        <>
-          <p className="section-title">♿ 장애인 스포츠강좌 등록시설</p>
+        <CollapsibleSection
+          title="♿ 장애인 스포츠강좌 등록시설"
+          subtitle={`${disableInfo.list.length}곳`}
+          defaultOpen // 사용자가 직접 선택한 옵션이라 기본으로 펼쳐둠
+        >
           {disableInfo.note ? (
             <p className="hint" style={{ marginBottom: 12 }}>
               {disableInfo.note}
@@ -107,7 +134,7 @@ export default function HomeScreen({ data, answers }) {
               <p className="hint">이 지역에는 아직 등록된 장애인 스포츠강좌 시설이 없어요.</p>
             )}
           </div>
-        </>
+        </CollapsibleSection>
       ) : null}
     </>
   );
