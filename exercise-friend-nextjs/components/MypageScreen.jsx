@@ -1,3 +1,10 @@
+// ============================================================
+// [마이페이지] 북마크한 종목, 문자알림(mock), 체력인증 도전과제
+// - 렌더링 위치: App.jsx가 screenMode==='mypage'일 때 렌더링 (탭바의 "마이")
+// - 문자(SMS) 알림 부분은 실제 발송 기능 없는 mock(데모)임
+// - 체력인증 도전과제 부분은 CertChallenge.jsx를 그대로 불러와서 렌더링
+// ============================================================
+
 "use client";
 
 import { sportEmoji, findRegionKey } from "../lib/logic";
@@ -18,7 +25,7 @@ export default function MypageScreen({ data, answers, onRestart }) {
           interests.map((sport) => (
             <div className="facility-card bookmark-row" key={sport}>
               <span>
-                {sportEmoji(sport)} {sport}
+                <span aria-hidden="true">{sportEmoji(sport)}</span> {sport}
               </span>
               <label>
                 <input
@@ -35,7 +42,9 @@ export default function MypageScreen({ data, answers, onRestart }) {
         )}
       </div>
 
-      <p className="section-title">📱 문자(SMS) 알림</p>
+      <p className="section-title">
+        <span aria-hidden="true">📱 </span>문자(SMS) 알림
+      </p>
       <div className="facility-card">
         <p className="facility-addr">앱 확인이 어려우신 경우, 문자로도 강좌 신청 알림을 받아보실 수 있어요.</p>
         <input

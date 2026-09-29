@@ -1,7 +1,27 @@
+// ============================================================
+// [정보 카드 3종 모음] EquityCard(형평성지수) / RoutineCard(주간루틴) /
+//   FitnessRefCard(체력참고정보) - 관련있는 작은 카드들이라 한 파일에 모아둠
+// - 렌더링 위치: HomeScreen.jsx에서 각각 호출
+// - FitnessRefCard는 클라이언트 컴포넌트(useEffect)임: 체력인증 도전과제에서
+//   실제 측정 기록이 있으면 그걸로, 없으면 통증부위 답변으로 난이도를 추정하는
+//   하이브리드 로직(getCertBasedDifficulty/getBaselineDifficulty)을 씀
+// - IconTitle: 제목 문자열 앞 이모지를 자동으로 aria-hidden 처리하는 내부 헬퍼
+// ============================================================
+
 "use client";
 
 import { useEffect, useState } from "react";
-import { getBaselineDifficulty, getCertBasedDifficulty } from "../lib/logic";
+import { getBaselineDifficulty, getCertBasedDifficulty, splitLeadingEmoji } from "../lib/logic";
+
+function IconTitle({ text }) {
+  const { icon, text: rest } = splitLeadingEmoji(text);
+  return (
+    <p className="ref-title">
+      {icon ? <span aria-hidden="true">{icon} </span> : null}
+      {rest}
+    </p>
+  );
+}
 
 export function EquityCard({ eq, regionName }) {
   const belowAvg = eq.myCnt < eq.avgCnt;
@@ -10,7 +30,7 @@ export function EquityCard({ eq, regionName }) {
     : "전국 평균 이상으로 다양한 체육시설이 등록되어 있어요.";
   return (
     <div className="ref-card">
-      <p className="ref-title">📍 우리 동네 체육 복지 지수</p>
+      <IconTitle text="🏆 우리 동네 체육 복지 지수" />
       <p className="ref-sub">
         {regionName} · 전국 {eq.total}개 지역 비교 (공공데이터 기준)
       </p>
@@ -28,7 +48,7 @@ export function RoutineCard({ routine }) {
   const seqs = ["준비 운동", "본 운동", "정리 운동"];
   return (
     <div className="ref-card">
-      <p className="ref-title">🗓️ 이번 주 표준 운동 루틴</p>
+      <IconTitle text="🗓️ 이번 주 표준 운동 루틴" />
       <p className="ref-sub">
         {routine.grp} · {routine.weekLabel} 프로그램 (공공데이터)
       </p>
@@ -69,9 +89,12 @@ export function FitnessRefCard({ data, gender, age, painAreas, fitnessStandards 
   data.grades.forEach((r) => (g[r.grade] = r.value));
   return (
     <div className="ref-card">
-      <p className="ref-title">📊 국민체력100 참고 정보</p>
+      <IconTitle text="📊 국민체력100 참고 정보" />
       <p className="ref-sub">
-        {data.stage.split("(")[0]} · 만 {data.range}세 · {data.sex}성 기준 (공공데이터)
+        {data.stage.split("(")[0]} · 만 {data.range}세 · {data.sex}성 기준
+      </p>
+      <p className="ref-source">
+        출처: 국민체력100 누리집(nfa.kspo.or.kr) 공개 기준표를 직접 수집·정리함 (Open API 미제공 항목)
       </p>
       <div className="ref-grades">
         <b>{data.item}</b>

@@ -1,6 +1,19 @@
+// ============================================================
+// [최상위 앱 컴포넌트] 이 프로젝트의 "뇌" 역할
+// - 렌더링 위치: app/page.js 에서 <App /> 으로 호출됨 (앱의 시작점)
+// - 하는 일:
+//   1) 3단계 데이터 로딩 관리 (1단계: 지역/종목 인덱스 → 2단계: 설문 끝나면
+//      체력/영상 데이터+내 지역 시설 → 3단계: 검색 탭 열 때 전국 데이터)
+//   2) 온보딩 답변(answers), 현재 질문(current), 화면(screenMode: quiz/done/
+//      results/search/community/mypage) 상태를 전부 관리
+//   3) 온보딩 중간저장/이어하기, 큰글씨 모드 처리
+// - 화면 전환 시 각 화면 컴포넌트(QuizStep, DoneScreen, HomeScreen,
+//   SearchScreen, CommunityScreen, MypageScreen)를 골라서 렌더링함
+// ============================================================
+
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { steps } from "../lib/steps";
 import {
   findRegionKey,
@@ -26,18 +39,22 @@ import SearchScreen from "./SearchScreen";
 // 2단계(설문 끝나고): 체력/영상 데이터 + 내가 고른 지역 하나의 시설 데이터
 // 3단계(검색 탭 열 때만): 전국 259개 지역 전체 데이터 (제일 무거움, 검색 안 쓰면 평생 안 받음)
 const REGION_INDEX_FILE = "/data/region_index.json";
-const SECONDARY_FILES = {
+const BASE_SECONDARY_FILES = {
   fitness: "/data/fitness_standards.json",
   guide: "/data/guide_data.json",
   mscl: "/data/mscl_data.json",
-  disable: "/data/disable_facilities.json",
   stdFtns: "/data/std_ftns_data.json",
   cert: "/data/cert_data.json",
+  routineGoal: "/data/routine_goal_data.json",
 };
+const DISABLE_FILE = "/data/disable_facilities.json"; // 장애인 옵션 선택 시에만 로드 (870KB)
 const FULL_KSPO_FILE = "/data/kspo_data.json"; // 검색 전용 (지연 로딩)
 
-function regionFileUrl(regionKey) {
-  return `/data/region_facilities/${regionKey.replace(/ /g, "_")}.json`;
+function regionFileUrl(regionIndex, regionKey) {
+  // 한글 파일명은 Windows에서 압축 해제할 때 깨질 수 있어서, 숫자 ID로 매핑해서 사용함
+  const fileId = regionIndex.regionFileMap ? regionIndex.regionFileMap[regionKey] : null;
+  if (fileId === null || fileId === undefined) return null;
+  return `/data/region_facilities/${fileId}.json`;
 }
 
 function canProceedForStep(step, answers) {
@@ -51,7 +68,7 @@ function canProceedForStep(step, answers) {
 
 export default function App() {
   const [regionIndex, setRegionIndex] = useState(null); // {regions, regionSports}
-  const [secondaryData, setSecondaryData] = useState(null); // {fitness, guide, mscl, disable, stdFtns, cert}
+  const [secondaryData, setSecondaryData] = useState(null); // {fitness, guide, mscl, disable?, stdFtns, cert}
   const [regionFacilitiesMap, setRegionFacilitiesMap] = useState({}); // regionKey -> facility[]
   const [fullDataLoaded, setFullDataLoaded] = useState(false); // 검색용 전국 데이터 로드 여부
 
@@ -60,23 +77,41 @@ export default function App() {
   const [screenMode, setScreenMode] = useState("quiz"); // quiz -> done -> results/search/community/mypage
   const [programCache, setProgramCache] = useState({});
   const [largeText, setLargeText] = useState(false);
-  const [highContrast, setHighContrast] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [hasCheckedResume, setHasCheckedResume] = useState(false);
   const [resumeData, setResumeData] = useState(null);
+  const [loadError, setLoadError] = useState(null); // 데이터 로딩 실패 메시지 (있으면 재시도 버튼 표시)
+  const [retryTick, setRetryTick] = useState(0); // "다시 시도" 누르면 이 값을 바꿔서 아래 useEffect를 재실행시킴
+
+  // "지금 요청 중"임을 추적하는 ref. state가 아니라 ref를 쓰는 이유:
+  // state는 비동기로 갱신돼서, 응답 오기 전에 화면이 여러 번 다시 그려지면
+  // "아직 안 왔으니까 또 요청하자"는 중복 요청이 생길 수 있음 (실제로 있었던 버그).
+  // ref는 즉시 갱신되니까 같은 요청이 두 번 나가는 걸 확실히 막아줌.
+  const secondaryLoadingRef = useRef(false);
+  const regionLoadingRef = useRef(new Set());
+  const fullDataLoadingRef = useRef(false);
 
   // ---- 1단계: 지역/종목 인덱스만 빠르게 로드 (온보딩은 이것만 있어도 시작 가능) ----
   useEffect(() => {
     let cancelled = false;
     fetch(REGION_INDEX_FILE)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`지역 인덱스 응답 실패 (${res.status})`);
+        return res.json();
+      })
       .then((json) => {
-        if (!cancelled) setRegionIndex(json);
+        if (!cancelled) {
+          setRegionIndex(json);
+          setLoadError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError("서비스를 불러오지 못했어요. 네트워크 상태를 확인하고 다시 시도해주세요.");
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [retryTick]);
 
   // ---- 2단계: 설문이 끝나갈 때(done 화면 진입 시점) 체력/영상 데이터 + 내 지역 데이터를 미리 준비 ----
   useEffect(() => {
@@ -84,43 +119,79 @@ export default function App() {
     const needsResults = ["done", "results", "mypage"].includes(screenMode);
     if (!needsResults) return;
 
-    if (!secondaryData) {
+    if (!secondaryData && !secondaryLoadingRef.current) {
+      secondaryLoadingRef.current = true;
+      const files = { ...BASE_SECONDARY_FILES };
+      if (answers.disabilityInterest === "예") {
+        files.disable = DISABLE_FILE; // 장애인 정보를 원한 사람한테만 870KB 추가로 로드
+      }
       Promise.all(
-        Object.entries(SECONDARY_FILES).map(([key, url]) =>
-          fetch(url)
-            .then((res) => res.json())
-            .then((json) => [key, json])
+        Object.entries(files).map(([key, url]) =>
+          fetch(url).then((res) => {
+            if (!res.ok) throw new Error(`${url} 응답 실패 (${res.status})`);
+            return res.json().then((json) => [key, json]);
+          })
         )
-      ).then((entries) => {
-        const merged = {};
-        entries.forEach(([key, json]) => {
-          merged[key] = json;
+      )
+        .then((entries) => {
+          const merged = {};
+          entries.forEach(([key, json]) => {
+            merged[key] = json;
+          });
+          setSecondaryData(merged);
+          setLoadError(null);
+        })
+        .catch((err) => {
+          // 실패해도 영원히 멈추지 않게: 재시도 가능하도록 플래그를 풀어줌
+          secondaryLoadingRef.current = false;
+          setLoadError("데이터를 불러오지 못했어요. 네트워크 상태를 확인하고 다시 시도해주세요.");
         });
-        setSecondaryData(merged);
-      });
     }
 
     const regionKey = findRegionKey(regionIndex, answers.region || "");
-    if (regionKey && regionFacilitiesMap[regionKey] === undefined) {
-      fetch(regionFileUrl(regionKey))
-        .then((res) => res.json())
+    const fileUrl = regionKey ? regionFileUrl(regionIndex, regionKey) : null;
+    if (regionKey && fileUrl && regionFacilitiesMap[regionKey] === undefined && !regionLoadingRef.current.has(regionKey)) {
+      regionLoadingRef.current.add(regionKey);
+      fetch(fileUrl)
+        .then((res) => {
+          if (!res.ok) throw new Error(`지역 데이터 응답 실패 (${res.status})`);
+          return res.json();
+        })
         .then((arr) => {
           setRegionFacilitiesMap((prev) => ({ ...prev, [regionKey]: arr }));
+        })
+        .catch((err) => {
+          regionLoadingRef.current.delete(regionKey); // 재시도 가능하도록 플래그를 풀어줌
+          setLoadError("우리 동네 시설 정보를 불러오지 못했어요. 네트워크 상태를 확인하고 다시 시도해주세요.");
         });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screenMode, regionIndex, answers.region]);
+  }, [screenMode, regionIndex, answers.region, retryTick]);
+
+  function handleRetryLoad() {
+    setLoadError(null);
+    setRetryTick((t) => t + 1);
+  }
 
   // ---- 3단계: 검색 탭을 처음 열 때만 전국 데이터 전체를 불러옴 ----
   useEffect(() => {
-    if (screenMode !== "search" || fullDataLoaded || !regionIndex) return;
+    if (screenMode !== "search" || fullDataLoaded || fullDataLoadingRef.current || !regionIndex) return;
+    fullDataLoadingRef.current = true;
     fetch(FULL_KSPO_FILE)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`전국 데이터 응답 실패 (${res.status})`);
+        return res.json();
+      })
       .then((full) => {
         setRegionFacilitiesMap(full.regionFacilities || {});
         setFullDataLoaded(true);
+        setLoadError(null);
+      })
+      .catch((err) => {
+        fullDataLoadingRef.current = false;
+        setLoadError("전국 시설 데이터를 불러오지 못했어요. 네트워크 상태를 확인하고 다시 시도해주세요.");
       });
-  }, [screenMode, fullDataLoaded, regionIndex]);
+  }, [screenMode, fullDataLoaded, regionIndex, retryTick]);
 
   // ---- 페이지를 처음 열었을 때, 저장된 온보딩 진행상태가 있는지 딱 한 번 확인 ----
   useEffect(() => {
@@ -158,13 +229,10 @@ export default function App() {
     }
   }
 
-  // ---- 큰글씨 / 고대비 모드 ----
+  // ---- 큰글씨 모드 ----
   useEffect(() => {
     document.documentElement.classList.toggle("large-text", largeText);
   }, [largeText]);
-  useEffect(() => {
-    document.body.classList.toggle("high-contrast", highContrast);
-  }, [highContrast]);
 
   // ---- "해보고 싶은 운동" 단계: 지역 데이터 기반으로 종목 목록 준비 ----
   useEffect(() => {
@@ -240,12 +308,7 @@ export default function App() {
   }
 
   const a11yBar = (
-    <A11yBar
-      largeText={largeText}
-      highContrast={highContrast}
-      onToggleLargeText={() => setLargeText((v) => !v)}
-      onToggleContrast={() => setHighContrast((v) => !v)}
-    />
+    <A11yBar largeText={largeText} onToggleLargeText={() => setLargeText((v) => !v)} />
   );
 
   // 1단계(지역 인덱스)도 아직이면 아예 아무것도 못 보여줌 (몇백 KB라 매우 빠름)
@@ -256,10 +319,19 @@ export default function App() {
         <div className="page-shell">
           {a11yBar}
           <div className="card">
-            <div className="loading-wrap">
-              <div className="spinner" />
-              <p>불러오는 중...</p>
-            </div>
+            {loadError ? (
+              <div className="loading-wrap">
+                <p>{loadError}</p>
+                <button className="btn-outline" type="button" onClick={handleRetryLoad}>
+                  다시 시도
+                </button>
+              </div>
+            ) : (
+              <div className="loading-wrap">
+                <div className="spinner" />
+                <p>불러오는 중...</p>
+              </div>
+            )}
           </div>
         </div>
       </>
@@ -274,6 +346,7 @@ export default function App() {
       regions: regionIndex.regions,
       regionSports: regionIndex.regionSports,
       regionFacilities: regionFacilitiesMap,
+      regionFacilityCounts: regionIndex.regionFacilityCounts,
     },
     ...(secondaryData || {}),
   };
@@ -284,6 +357,16 @@ export default function App() {
   const searchDataReady = fullDataLoaded;
 
   function renderLoadingCard(message) {
+    if (loadError) {
+      return (
+        <div className="loading-wrap">
+          <p>{loadError}</p>
+          <button className="btn-outline" type="button" onClick={handleRetryLoad}>
+            다시 시도
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="loading-wrap">
         <div className="spinner" />

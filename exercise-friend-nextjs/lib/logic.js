@@ -1,4 +1,11 @@
 // ============================================================
+// [핵심 비즈니스 로직 모음] 이 프로젝트의 "계산기" 역할 - 거의 모든 컴포넌트가
+// 여기서 함수를 가져다 씀. 화면을 안 그리고 순수 계산/데이터가공만 담당함.
+// 주요 영역: 종목-이모지 매핑, 지역매칭, 지역형평성지수, 체력기준 조회+난이도추천,
+// 영상 필터링(재활/가이드/목표별루틴), 장애인시설 조회, 온보딩 저장/복원,
+// localStorage 헬퍼(체력등급, 익명참여자ID), 이모지 자동분리(스크린리더 대응)
+// ============================================================
+// ============================================================
 // 종목 이름 -> 이모지 매핑
 // ============================================================
 export const SPORT_EMOJI = {
@@ -132,16 +139,18 @@ export function getGuideVideos(guideVideos, goals, ageLabel) {
 }
 
 // ============================================================
-// 장애인 스포츠강좌 시설
+// 장애인 이용 가능 시설 안내
+// (강좌 데이터와의 조인 키가 없어 시설 목록만 제공함 — README.md 참고)
 // ============================================================
 export function getDisableFacilities(disableFacilities, regionKey, interests) {
-  const all = regionKey ? disableFacilities[regionKey] || [] : [];
+  const source = disableFacilities || {};
+  const all = regionKey ? source[regionKey] || [] : [];
   if (!all.length) return { list: [], note: "" };
   const matched = all.filter((f) => (interests || []).includes(f.m));
   if (!matched.length) {
     return {
       list: all.slice(0, 4),
-      note: "선택하신 종목의 장애인 스포츠강좌는 아직 없어서, 같은 지역의 다른 종목을 보여드려요.",
+      note: "선택하신 종목의 장애인 이용 가능 시설은 아직 없어서, 같은 지역의 다른 종목을 보여드려요.",
     };
   }
   return { list: matched.slice(0, 4), note: "" };
@@ -152,8 +161,11 @@ export function getDisableFacilities(disableFacilities, regionKey, interests) {
 // ============================================================
 export function getRegionEquity(kspoData, regionKey) {
   if (!regionKey) return null;
-  const regions = Object.keys(kspoData.regionFacilities);
-  const counts = regions.map((r) => ({ r, cnt: (kspoData.regionFacilities[r] || []).length }));
+  // regionFacilityCounts: {지역명: 시설개수} - 지연로딩 중에도 항상 전체 259개 지역이 들어있는 가벼운 맵.
+  // (regionFacilities는 지금 화면에 필요한 지역만 부분적으로 들어있을 수 있어서, 순위 계산에는 못 씀)
+  const countsMap = kspoData.regionFacilityCounts;
+  if (!countsMap) return null;
+  const counts = Object.entries(countsMap).map(([r, cnt]) => ({ r, cnt }));
   counts.sort((a, b) => b.cnt - a.cnt);
   const total = counts.length;
   const myIdx = counts.findIndex((c) => c.r === regionKey);
@@ -180,6 +192,46 @@ function getISOWeek(date) {
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
+// ============================================================
+// 목표별 맞춤 루틴 (미활용이던 ROUTINE 공공데이터 활용)
+// 통증부위/연령/운동목적을 보고, 가장 관련 있는 목표 하나를 골라서
+// 준비-본-정리 운동으로 구성된 루틴을 보여줌.
+// ------------------------------------------------------------
+export function getGoalRoutine(routineData, painAreas, ageLabel, goals) {
+  const pains = painAreas || [];
+  const goalList = goals || [];
+  const candidates = [];
+
+  if (ageLabel === "70대 이상") candidates.push("낙상 예방", "골다공증 예방", "인지노쇠 예방");
+  if (pains.includes("허리")) candidates.push("요통 예방");
+  if (pains.includes("어깨")) candidates.push("직장인 뭉친 어깨 예방");
+  if (goalList.includes("유연성 · 뻐근함 완화")) candidates.push("스트레칭");
+  if (goalList.includes("근력 키우기")) candidates.push("근력운동");
+  if (goalList.includes("체중 관리 · 유산소")) candidates.push("유산소");
+
+  const aim = candidates.find((c) => routineData.some((r) => r.aim === c));
+  if (!aim) return null;
+
+  const items = routineData.filter(
+    (r) => r.aim === aim && (r.grp === "공통" || r.grp === "성인") && r.seq && r.n && r.n.trim()
+  );
+  // 목표마다 운동단계 이름 체계가 달라서(예: 요통예방=준비/본/정리, 스트레칭=스트레칭(짐볼) 등)
+  // 고정된 3단계로 묶지 않고, 실제 존재하는 단계명 기준으로 동적으로 묶음.
+  const bySeq = {};
+  const seen = {};
+  items.forEach((item) => {
+    if (!bySeq[item.seq]) {
+      bySeq[item.seq] = [];
+      seen[item.seq] = new Set();
+    }
+    if (seen[item.seq].has(item.n)) return;
+    seen[item.seq].add(item.n);
+    bySeq[item.seq].push(item);
+  });
+  if (!Object.keys(bySeq).length) return null;
+  return { aim, bySeq };
+}
+
 export function getWeeklyRoutine(stdFtnsData, ageLabel) {
   const grp = ageLabel === "70대 이상" ? "어르신" : "성인";
   const weekIdx = getISOWeek(new Date()) % 4;
@@ -269,8 +321,39 @@ function safeSetItem(key, value) {
   }
 }
 
+// ============================================================
+// 익명 참여자 ID
+// 로그인이 없는 서비스라서, 브라우저마다 랜덤 ID를 하나 만들어 저장해두고
+// "같은 참여자의 반복 제출/반복 클릭"을 구분하는 데 씀.
+// (한계: 브라우저 데이터를 지우거나 기기를 바꾸면 다른 참여자로 인식됨)
+// ------------------------------------------------------------
+export function getParticipantId() {
+  const KEY = "ef-participant-id";
+  const existing = safeGetItem(KEY);
+  if (existing) return existing;
+  const id =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `p-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  safeSetItem(KEY, id);
+  return id;
+}
+
 export function facilityKey(f) {
   return `${f.n}|${f.a}`;
+}
+
+// ============================================================
+// 스크린리더 접근성: 문자열 맨 앞의 이모지를 분리해줌.
+// 이모지는 장식용이라 스크린리더가 읽으면 오히려 방해되므로
+// (예: "사람 10대" 처럼 이상하게 읽힘), 아이콘은 aria-hidden으로
+// 숨기고 실제 텍스트만 읽히게 만들 때 씀.
+// ------------------------------------------------------------
+export function splitLeadingEmoji(str) {
+  const s = str || "";
+  const m = s.match(/^([\p{Extended_Pictographic}\uFE0F\u200D]+)\s*/u);
+  if (!m) return { icon: null, text: s };
+  return { icon: m[1], text: s.slice(m[0].length) };
 }
 
 export function getCertLevel(name) {

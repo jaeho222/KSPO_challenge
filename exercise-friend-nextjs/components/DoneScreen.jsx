@@ -1,3 +1,10 @@
+// ============================================================
+// [온보딩 완료 화면] 설문 다 끝나고 "결과 보기" 누르기 전 요약 화면
+// - 렌더링 위치: App.jsx가 screenMode==='done'일 때 렌더링
+// - 내가 답한 내용을 요약해서 보여주고, "맞춤 시설 보러가기" 버튼으로
+//   HomeScreen 진입, "다시 하기"로 온보딩 재시작 가능
+// ============================================================
+
 "use client";
 
 export default function DoneScreen({ answers, onRestart, onGoToResults }) {
@@ -7,7 +14,7 @@ export default function DoneScreen({ answers, onRestart, onGoToResults }) {
 
   return (
     <div className="done-screen">
-      <div className="big-emoji">🎉</div>
+      <div className="big-emoji" aria-hidden="true">🎉</div>
       <h1>설문이 끝났어요!</h1>
       <p className="sub">입력하신 내용을 바탕으로 딱 맞는 프로그램을 찾아드릴게요.</p>
       <div className="summary">

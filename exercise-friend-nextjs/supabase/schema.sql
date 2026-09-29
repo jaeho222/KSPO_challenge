@@ -13,9 +13,20 @@ create table if not exists reviews (
   text text not null default '',
   photo_url text,
   tags text[] not null default '{}',
+  hidden boolean not null default false,
   created_at timestamptz not null default now()
 );
 create index if not exists idx_reviews_facility_key on reviews (facility_key);
+
+-- 1-1) 후기 신고 기록 (같은 사람이 같은 후기를 여러 번 신고 못 하게 (review_id, reporter) 유일)
+create table if not exists review_reports (
+  id uuid primary key default gen_random_uuid(),
+  review_id uuid not null references reviews (id) on delete cascade,
+  reporter_participant_id text not null,
+  reason text not null default '',
+  created_at timestamptz not null default now(),
+  unique (review_id, reporter_participant_id)
+);
 
 -- 2) 예약 신청서
 create table if not exists booking_requests (
@@ -44,6 +55,9 @@ create table if not exists cert_submissions (
   created_at timestamptz not null default now()
 );
 create index if not exists idx_cert_bracket on cert_submissions (item, stage, age_range, sex);
+-- 참여자 구분용 컬럼 (이미 테이블이 있는 DB에서도 에러 없이 추가되도록 alter를 함께 둠)
+alter table cert_submissions add column if not exists participant_id text;
+create index if not exists idx_cert_participant on cert_submissions (participant_id);
 
 -- 4) 접근성 정보 크라우드소싱 (시설별 태그 누적)
 create table if not exists accessibility_reports (
@@ -64,9 +78,32 @@ create table if not exists community_posts (
   message text not null default '',
   nickname text not null,
   join_count int not null default 0,
+  creator_participant_id text,
+  max_members int,
   created_at timestamptz not null default now()
 );
 create index if not exists idx_community_region on community_posts (region);
+create index if not exists idx_community_creator on community_posts (creator_participant_id);
+
+-- 6-1) 커뮤니티 댓글
+create table if not exists community_comments (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references community_posts (id) on delete cascade,
+  nickname text not null,
+  message text not null,
+  participant_id text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_comments_post on community_comments (post_id);
+
+-- 6) 커뮤니티 참여 신청 기록 (같은 사람이 같은 글에 중복 신청 못 하게)
+create table if not exists community_joins (
+  post_id uuid not null references community_posts (id) on delete cascade,
+  participant_id text not null,
+  created_at timestamptz not null default now(),
+  primary key (post_id, participant_id)
+);
+alter table community_joins enable row level security;
 
 -- ============================================================
 -- Storage: 후기 사진을 담을 버킷도 하나 만들어야 해.

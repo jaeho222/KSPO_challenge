@@ -1,3 +1,11 @@
+// ============================================================
+// [예약/문의 신청 폼] "문의/예약 신청하기" 버튼과 그 아래 입력 폼
+// - 렌더링 위치: FacilityCard.jsx 안에 포함되어 시설 카드마다 하나씩 나타남
+// - 연락처+메시지를 입력받아 /api/booking-requests 로 전송, Supabase의
+//   booking_requests 테이블에 저장됨 (30일 후 pg_cron으로 자동 삭제됨,
+//   supabase/migration_004 참고)
+// ============================================================
+
 "use client";
 
 import { useState } from "react";
@@ -41,7 +49,7 @@ export default function BookingRequest({ facilityKey, facilityName, facilityAddr
   if (done) {
     return (
       <p className="hint" style={{ marginTop: 8 }}>
-        ✅ 예약 신청이 접수됐어요! 입력하신 번호로 시설에서 곧 연락드릴 예정이에요.
+        <span aria-hidden="true">✅ </span>예약 신청이 접수됐어요! 입력하신 번호로 시설에서 곧 연락드릴 예정이에요.
       </p>
     );
   }

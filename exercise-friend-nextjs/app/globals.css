@@ -9,6 +9,7 @@
   --accent: #e8873a;
   --accent-soft: #fdece0;
   --accent-text: #b25e1f;
+  --weekend-red: #c0392b;
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -25,6 +26,7 @@
     --accent: #f0a15f;
     --accent-soft: #2c2013;
     --accent-text: #f0a15f;
+    --weekend-red: #ff6b5b;
   }
 }
 :root[data-theme="dark"] {
@@ -38,6 +40,7 @@
   --accent: #f0a15f;
   --accent-soft: #2c2013;
   --accent-text: #f0a15f;
+  --weekend-red: #ff6b5b;
 }
 * {
   box-sizing: border-box;
@@ -135,23 +138,6 @@ body {
 }
 html.large-text {
   font-size: 119%;
-}
-body.high-contrast {
-  --bg: #ffffff;
-  --card: #ffffff;
-  --ink: #000000;
-  --muted: #333333;
-  --line: #000000;
-  --primary: #000000;
-  --primary-dark: #000000;
-  --accent: #000000;
-  --accent-soft: #e0e0e0;
-  --accent-text: #000000;
-}
-body.high-contrast .choice,
-body.high-contrast .facility-card,
-body.high-contrast .text-input {
-  border-width: 2px;
 }
 
 .track {
@@ -389,6 +375,12 @@ button.nav:active {
   font-size: 0.7812rem;
   color: var(--muted);
 }
+.ref-source {
+  margin: -6px 0 10px;
+  font-size: 0.6875rem;
+  color: var(--muted);
+  font-style: italic;
+}
 .ref-grades {
   font-size: 0.875rem;
   margin-bottom: 8px;
@@ -419,6 +411,13 @@ button.nav:active {
   border-radius: 14px;
   padding: 16px 16px 14px;
   background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* 같은 줄의 카드들과 높이를 맞춤 (grid stretch) */
+}
+.facility-card-bottom {
+  margin-top: auto; /* 위쪽 내용 길이가 달라도 후기/예약 버튼을 항상 카드 맨 아래로 붙임 */
+  padding-top: 10px;
 }
 .sport-badge {
   display: inline-block;
@@ -429,6 +428,11 @@ button.nav:active {
   padding: 3px 10px;
   border-radius: 999px;
   margin: 0 6px 8px 0;
+}
+.access-badge {
+  background: none;
+  border: 1.5px solid var(--accent-text);
+  color: var(--accent-text);
 }
 .facility-name {
   margin: 0 0 4px;
@@ -581,6 +585,9 @@ button.nav:active {
   font-size: 0.9375rem;
   font-weight: 700;
   margin: 2px 0 4px;
+}
+.calendar-date.weekend {
+  color: var(--weekend-red);
 }
 .calendar-tags {
   display: flex;

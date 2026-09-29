@@ -1,6 +1,18 @@
+// ============================================================
+// [후기 + 접근성 정보 + 신고하기] 시설 카드 안에 들어가는 후기 섹션
+// - 렌더링 위치: FacilityCard.jsx 안에 포함
+// - 별점+텍스트+사진+접근성 체크박스(휠체어 진입 가능 등)로 후기 작성
+//   (누구나 작성 가능, 예약 인증 없음 - 과거엔 인증 붙였다가 사용자 요청으로 제거함)
+// - 접근성 체크박스는 여러 후기에서 모아서 카드 맨 위에 "한눈에" 요약 배지로 표시
+// - 🚩 신고하기: /api/reviews/report 로 실제 전송됨. 서로 다른 참여자 3명이
+//   신고하면 서버에서 자동으로 해당 후기를 숨김(hidden=true) 처리함
+// - 쓰이는 API: /api/reviews (목록조회/작성), /api/reviews/report (신고)
+// ============================================================
+
 "use client";
 
 import { useEffect, useState } from "react";
+import { getParticipantId } from "../lib/logic";
 
 const TAG_OPTIONS = ["휠체어 진입 가능", "경사로 있음", "엘리베이터 있음", "장애인 화장실 있음"];
 
@@ -20,13 +32,15 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
 
   async function loadReviews() {
     try {
-      const res = await fetch(`/api/reviews?facilityKey=${encodeURIComponent(facilityKey)}`);
+      const params = new URLSearchParams({ facilityKey, participantId: getParticipantId() });
+      const res = await fetch(`/api/reviews?${params.toString()}`);
       if (!res.ok) return;
       const data = await res.json();
       setReviews(data.reviews || []);
       setAvg(data.avg);
       setCount(data.count || 0);
       setTagSummary(data.tagSummary || []);
+      setReportedIds(new Set((data.reviews || []).filter((r) => r.reported).map((r) => r.id)));
     } catch (e) {
       /* 조용히 무시: 후기 로딩 실패해도 나머지 화면은 정상 동작 */
     } finally {
@@ -39,12 +53,25 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facilityKey]);
 
-  function handleReport(reviewId) {
+  async function handleReport(reviewId) {
     if (reportedIds.has(reviewId)) return;
     const ok = window.confirm("이 후기를 신고하시겠어요? 부적절한 내용(욕설, 광고, 사생활 침해 등)일 때 이용해주세요.");
     if (!ok) return;
-    // TODO(백엔드): 신고 접수 API가 만들어지면 여기서 실제로 POST 요청을 보내야 함.
-    setReportedIds((prev) => new Set(prev).add(reviewId));
+    try {
+      const res = await fetch("/api/reviews/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviewId, participantId: getParticipantId() }),
+      });
+      if (res.ok) {
+        setReportedIds((prev) => new Set(prev).add(reviewId));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "신고 접수에 실패했어요.");
+      }
+    } catch (e) {
+      alert("신고 접수에 실패했어요. 네트워크를 확인해주세요.");
+    }
   }
 
   function toggleTag(tag) {
@@ -91,7 +118,7 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
       {/* 접근성 정보: 여러 후기에서 언급된 걸 모아서 맨 위에 한눈에 보이게 표시 */}
       {tagSummary.length ? (
         <div className="access-summary">
-          ♿{" "}
+          <span aria-hidden="true">♿ </span>
           {tagSummary.map((t, i) => (
             <span key={t.tag}>
               {i > 0 ? " · " : ""}
@@ -107,18 +134,20 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
       ) : count > 0 ? (
         <>
           <p style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 700 }}>
-            <span className="stars">
+            <span className="stars" aria-hidden="true">
               {"★".repeat(Math.round(avg))}
               {"☆".repeat(5 - Math.round(avg))}
             </span>{" "}
-            {avg.toFixed(1)} <span className="course-meta">({count}개 후기)</span>
+            {avg.toFixed(1)}점 <span className="course-meta">({count}개 후기)</span>
           </p>
           {reviews.slice(0, 3).map((r) => (
             <div key={r.id} style={{ marginBottom: 8 }}>
               <p className="review-snippet" style={{ margin: 0 }}>
-                <span className="stars">
-                  {"★".repeat(r.rating)}
-                  {"☆".repeat(5 - r.rating)}
+                <span className="stars" role="img" aria-label={`${r.rating}점`}>
+                  <span aria-hidden="true">
+                    {"★".repeat(r.rating)}
+                    {"☆".repeat(5 - r.rating)}
+                  </span>
                 </span>{" "}
                 {r.text}
               </p>
@@ -126,7 +155,8 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
                 <div style={{ marginTop: 4 }}>
                   {r.tags.map((t) => (
                     <span className="sport-badge" key={t} style={{ fontSize: 11 }}>
-                      ♿ {t}
+                      <span aria-hidden="true">♿ </span>
+                      {t}
                     </span>
                   ))}
                 </div>
@@ -154,7 +184,13 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
                   marginTop: 4,
                 }}
               >
-                {reportedIds.has(r.id) ? "신고 접수됨" : "🚩 신고하기"}
+                {reportedIds.has(r.id) ? (
+                  "신고 접수됨"
+                ) : (
+                  <>
+                    <span aria-hidden="true">🚩 </span>신고하기
+                  </>
+                )}
               </button>
             </div>
           ))}
@@ -227,7 +263,7 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
         </div>
       ) : (
         <button className="btn-outline" type="button" onClick={() => setShowForm(true)} style={{ marginTop: 8 }}>
-          ✏️ 후기 남기기
+          <span aria-hidden="true">✏️ </span>후기 남기기
         </button>
       )}
     </div>

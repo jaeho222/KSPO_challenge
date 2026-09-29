@@ -1,3 +1,12 @@
+// ============================================================
+// [온보딩 질문 화면] 7단계 설문 중 "현재 보여줄 질문 1개"를 그리는 컴포넌트
+// - 렌더링 위치: App.jsx가 screenMode==='quiz'일 때 렌더링 (resumeData 없을 때)
+// - step.type에 따라 4가지 다른 UI를 그림: single(단일선택)/multi(다중선택)/
+//   text(직접입력, 지역명)/dynamic-multi(지역 데이터 기반 종목 선택)
+// - 선택지 이모지는 aria-hidden 처리되어 스크린리더가 안 읽음
+// - 질문 데이터 자체는 lib/steps.js 에 정의되어 있음
+// ============================================================
+
 "use client";
 
 export default function QuizStep({
@@ -91,7 +100,7 @@ export default function QuizStep({
               className={"choice" + (isSelected(label) ? " selected" : "")}
               onClick={() => onSelect(label)}
             >
-              <span className="emoji">{opt.emoji}</span>
+              <span className="emoji" aria-hidden="true">{opt.emoji}</span>
               <span>{opt.label}</span>
             </button>
           );

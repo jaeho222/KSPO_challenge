@@ -1,3 +1,10 @@
+// ============================================================
+// [후기 조회/작성 API] Supabase reviews 테이블 + Storage(review-photos 버킷)
+// - 호출하는 곳: components/FacilityReviews.jsx
+// - GET: hidden=false인(신고로 숨겨지지 않은) 후기만 반환, 접근성 태그 집계도 같이 줌
+// - POST: 사진 있으면 Storage에 업로드 후 공개 URL을 photo_url에 저장
+// ============================================================
+
 import { getSupabaseServerClient } from "../../../lib/supabaseClient";
 
 export const runtime = "nodejs";
@@ -16,6 +23,7 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const facilityKey = searchParams.get("facilityKey");
+    const participantId = searchParams.get("participantId");
     if (!facilityKey) {
       return Response.json({ error: "facilityKey required" }, { status: 400 });
     }
@@ -25,10 +33,22 @@ export async function GET(request) {
       .from("reviews")
       .select("id, rating, text, photo_url, tags, created_at")
       .eq("facility_key", facilityKey)
+      .eq("hidden", false)
       .order("created_at", { ascending: false });
 
     if (error) {
       return Response.json({ error: error.message }, { status: 500 });
+    }
+
+    // 내가 이미 신고한 후기 목록 (새로고침해도 "신고 접수됨" 상태가 유지되도록)
+    let reportedSet = new Set();
+    if (participantId && data.length) {
+      const { data: reports } = await supabase
+        .from("review_reports")
+        .select("review_id")
+        .eq("reporter_participant_id", participantId)
+        .in("review_id", data.map((r) => r.id));
+      reportedSet = new Set((reports || []).map((r) => r.review_id));
     }
 
     const reviews = data.map((r) => ({
@@ -37,6 +57,7 @@ export async function GET(request) {
       text: r.text,
       photoUrl: r.photo_url,
       tags: r.tags || [],
+      reported: reportedSet.has(r.id),
       ts: new Date(r.created_at).getTime(),
     }));
     const avg = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : null;
