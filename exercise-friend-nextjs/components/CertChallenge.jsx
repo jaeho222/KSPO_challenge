@@ -27,6 +27,8 @@ export default function CertChallenge({ fitnessStandards, certVideos, gender, ag
   const [inputs, setInputs] = useState({});
   const [percentiles, setPercentiles] = useState({});
   const [submitting, setSubmitting] = useState({});
+  const [playingVideo, setPlayingVideo] = useState({});
+  const [videoFailed, setVideoFailed] = useState({});
 
   useEffect(() => {
     const next = {};
@@ -197,14 +199,38 @@ export default function CertChallenge({ fitnessStandards, certVideos, gender, ag
                   </button>
                 </div>
 
-                {video ? (
-                  <button
-                    className="btn-outline"
-                    type="button"
-                    onClick={() => alert(`측정 방법 영상: ${video.n}`)}
-                  >
-                    측정 방법 보기
-                  </button>
+                {video && video.vid ? (
+                  <>
+                    {playingVideo[item.name] ? (
+                      <div style={{ marginBottom: 10 }}>
+                        {videoFailed[item.name] ? (
+                          <p className="hint" style={{ marginBottom: 8 }}>
+                            이 브라우저에서는 바로 재생이 안 돼요.{" "}
+                            <a href={video.vid} target="_blank" rel="noreferrer">
+                              새 탭에서 영상 열기
+                            </a>
+                          </p>
+                        ) : (
+                          // eslint-disable-next-line jsx-a11y/media-has-caption
+                          <video
+                            controls
+                            poster={video.thumb || undefined}
+                            style={{ width: "100%", borderRadius: 8, display: "block" }}
+                            onError={() => setVideoFailed((prev) => ({ ...prev, [item.name]: true }))}
+                          >
+                            <source src={video.vid} type="video/mp4" />
+                          </video>
+                        )}
+                      </div>
+                    ) : null}
+                    <button
+                      className="btn-outline"
+                      type="button"
+                      onClick={() => setPlayingVideo((prev) => ({ ...prev, [item.name]: !prev[item.name] }))}
+                    >
+                      {playingVideo[item.name] ? "영상 닫기" : "측정 방법 보기"}
+                    </button>
+                  </>
                 ) : null}
               </div>
             </div>

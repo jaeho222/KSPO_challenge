@@ -131,7 +131,7 @@ export default function HomeScreen({ data, answers }) {
                 <p style={{ fontWeight: 700, fontSize: "0.9375rem", margin: "0 0 6px" }}>{seq}</p>
                 <div className="facility-list">
                   {videos.slice(0, 3).map((v, i) => (
-                    <VideoCard key={i} title={v.n} desc={v.d} tags={[v.part].filter(Boolean)} />
+                    <VideoCard key={i} title={v.n} desc={v.d} tags={[v.part].filter(Boolean)} vid={v.vid} thumb={v.thumb} />
                   ))}
                 </div>
               </div>
@@ -147,7 +147,7 @@ export default function HomeScreen({ data, answers }) {
         >
           <div className="facility-list">
             {rehabVideos.map((v, i) => (
-              <VideoCard key={i} title={v.n} desc={v.d} tags={[v.part, v.step]} />
+              <VideoCard key={i} title={v.n} desc={v.d} tags={[v.part, v.step]} vid={v.vid} thumb={v.thumb} />
             ))}
           </div>
         </CollapsibleSection>
@@ -157,7 +157,7 @@ export default function HomeScreen({ data, answers }) {
         <CollapsibleSection title="🎯 목적에 맞는 운동 가이드" subtitle={`${guideVideos.length}개 영상`}>
           <div className="facility-list">
             {guideVideos.map((v, i) => (
-              <VideoCard key={i} title={v.n} desc={v.d} tags={[v.lv, v.p]} />
+              <VideoCard key={i} title={v.n} desc={v.d} tags={[v.lv, v.p]} vid={v.vid} thumb={v.thumb} />
             ))}
           </div>
         </CollapsibleSection>
