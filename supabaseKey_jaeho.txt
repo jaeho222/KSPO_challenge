@@ -1,5 +1,0 @@
-DATA API
-https://euxvbqofmkvmncysgmqh.supabase.co/rest/v1/
- 
-service role
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1eHZicW9mbWt2bW5jeXNnbXFoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDY4NDc3MCwiZXhwIjoyMTA2MjYwNzcwfQ.3F25YA7Q14sioMFf_SBB9FFcnyBv7IB7FiA-SVM6nxw
