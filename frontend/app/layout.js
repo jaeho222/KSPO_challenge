@@ -6,8 +6,9 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "운동친구",
+  title: "김코치",
   description: "체육 복지 취약지역을 위한 맞춤 운동 프로그램 추천 서비스",
+  icons: { icon: "/favicon.png" },
 };
 
 export default function RootLayout({ children }) {

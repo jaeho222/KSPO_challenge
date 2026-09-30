@@ -315,7 +315,7 @@ export default function App() {
   if (!regionIndex) {
     return (
       <>
-        <Header title="운동친구" showSearch={false} />
+        <Header title="김코치" showSearch={false} />
         <div className="page-shell">
           {a11yBar}
           <div className="card">
@@ -378,7 +378,7 @@ export default function App() {
   return (
     <>
       <Header
-        title="운동친구"
+        title="김코치"
         showSearch={isTabScreen}
         query={searchQuery}
         onQueryChange={handleSearchChange}
