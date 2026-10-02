@@ -21,6 +21,9 @@ import {
   saveOnboardingProgress,
   loadOnboardingProgress,
   clearOnboardingProgress,
+  saveCompletedOnboarding,
+  loadCompletedOnboarding,
+  clearCompletedOnboarding,
 } from "../lib/logic";
 import Header from "./Header";
 import A11yBar from "./A11yBar";
@@ -195,6 +198,14 @@ export default function App() {
 
   // ---- 페이지를 처음 열었을 때, 저장된 온보딩 진행상태가 있는지 딱 한 번 확인 ----
   useEffect(() => {
+    // 이전에 설문을 끝까지 마친 브라우저면 설문을 건너뛰고 바로 결과 화면으로
+    const completed = loadCompletedOnboarding();
+    if (completed) {
+      setAnswers(completed);
+      setScreenMode("results");
+      setHasCheckedResume(true);
+      return;
+    }
     const saved = loadOnboardingProgress();
     if (saved && ((saved.current || 0) > 0 || Object.keys(saved.answers || {}).length > 0)) {
       setResumeData(saved);
@@ -285,6 +296,7 @@ export default function App() {
     const step = steps[current];
     if (!canProceedForStep(step, answers)) return;
     if (current === steps.length - 1) {
+      saveCompletedOnboarding(answers);
       setScreenMode("done");
     } else {
       setCurrent((c) => c + 1);
@@ -299,6 +311,7 @@ export default function App() {
     setAnswers({});
     setProgramCache({});
     clearOnboardingProgress();
+    clearCompletedOnboarding();
   }
   function goToResults() {
     setScreenMode("results");

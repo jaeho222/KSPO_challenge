@@ -208,7 +208,14 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
                 key={n}
                 type="button"
                 onClick={() => setRating(n)}
-                style={{ background: "none", border: "none", fontSize: 24, cursor: "pointer", padding: 2 }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 24,
+                  cursor: "pointer",
+                  padding: 2,
+                  color: "var(--accent-text)",
+                }}
                 aria-label={`${n}점`}
               >
                 {n <= rating ? "★" : "☆"}

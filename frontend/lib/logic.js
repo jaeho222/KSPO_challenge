@@ -398,6 +398,35 @@ export function clearOnboardingProgress() {
   }
 }
 
+// ---- 설문을 끝까지 마친 사용자의 답변 (다음 방문 때 설문을 건너뛰고 바로 결과로 가기 위함) ----
+const COMPLETED_KEY = "ef-onboarding-completed";
+export function saveCompletedOnboarding(answers) {
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(COMPLETED_KEY, JSON.stringify(answers));
+  } catch (e) {
+    /* ignore */
+  }
+}
+export function loadCompletedOnboarding() {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(COMPLETED_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === "object" && parsed.region ? parsed : null;
+  } catch (e) {
+    return null;
+  }
+}
+export function clearCompletedOnboarding() {
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem(COMPLETED_KEY);
+  } catch (e) {
+    /* ignore */
+  }
+}
+
 // ============================================================
 // (참고) 국민체력100 기록 제출은 이제 components/CertChallenge.jsx에서
 // 서버 응답 에러 메시지를 직접 다루기 위해 fetch를 인라인으로 호출함.
