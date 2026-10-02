@@ -1,0 +1,105 @@
+diff --git a/frontend/components/App.jsx b/frontend/components/App.jsx
+index 1306d3a..bf971f4 100644
+--- a/frontend/components/App.jsx
++++ b/frontend/components/App.jsx
+@@ -21,6 +21,9 @@ import {
+   saveOnboardingProgress,
+   loadOnboardingProgress,
+   clearOnboardingProgress,
++  saveCompletedOnboarding,
++  loadCompletedOnboarding,
++  clearCompletedOnboarding,
+ } from "../lib/logic";
+ import Header from "./Header";
+ import A11yBar from "./A11yBar";
+@@ -195,6 +198,14 @@ export default function App() {
+ 
+   // ---- 페이지를 처음 열었을 때, 저장된 온보딩 진행상태가 있는지 딱 한 번 확인 ----
+   useEffect(() => {
++    // 이전에 설문을 끝까지 마친 브라우저면 설문을 건너뛰고 바로 결과 화면으로
++    const completed = loadCompletedOnboarding();
++    if (completed) {
++      setAnswers(completed);
++      setScreenMode("results");
++      setHasCheckedResume(true);
++      return;
++    }
+     const saved = loadOnboardingProgress();
+     if (saved && ((saved.current || 0) > 0 || Object.keys(saved.answers || {}).length > 0)) {
+       setResumeData(saved);
+@@ -285,6 +296,7 @@ export default function App() {
+     const step = steps[current];
+     if (!canProceedForStep(step, answers)) return;
+     if (current === steps.length - 1) {
++      saveCompletedOnboarding(answers);
+       setScreenMode("done");
+     } else {
+       setCurrent((c) => c + 1);
+@@ -299,6 +311,7 @@ export default function App() {
+     setAnswers({});
+     setProgramCache({});
+     clearOnboardingProgress();
++    clearCompletedOnboarding();
+   }
+   function goToResults() {
+     setScreenMode("results");
+diff --git a/frontend/components/FacilityReviews.jsx b/frontend/components/FacilityReviews.jsx
+index 1893346..ccf5470 100644
+--- a/frontend/components/FacilityReviews.jsx
++++ b/frontend/components/FacilityReviews.jsx
+@@ -208,7 +208,14 @@ export default function FacilityReviews({ facilityKey, facilityName }) {
+                 key={n}
+                 type="button"
+                 onClick={() => setRating(n)}
+-                style={{ background: "none", border: "none", fontSize: 24, cursor: "pointer", padding: 2 }}
++                style={{
++                  background: "none",
++                  border: "none",
++                  fontSize: 24,
++                  cursor: "pointer",
++                  padding: 2,
++                  color: "var(--accent-text)",
++                }}
+                 aria-label={`${n}점`}
+               >
+                 {n <= rating ? "★" : "☆"}
+diff --git a/frontend/lib/logic.js b/frontend/lib/logic.js
+index de75b8b..aa4d986 100644
+--- a/frontend/lib/logic.js
++++ b/frontend/lib/logic.js
+@@ -398,6 +398,35 @@ export function clearOnboardingProgress() {
+   }
+ }
+ 
++// ---- 설문을 끝까지 마친 사용자의 답변 (다음 방문 때 설문을 건너뛰고 바로 결과로 가기 위함) ----
++const COMPLETED_KEY = "ef-onboarding-completed";
++export function saveCompletedOnboarding(answers) {
++  try {
++    if (typeof window === "undefined") return;
++    window.localStorage.setItem(COMPLETED_KEY, JSON.stringify(answers));
++  } catch (e) {
++    /* ignore */
++  }
++}
++export function loadCompletedOnboarding() {
++  try {
++    if (typeof window === "undefined") return null;
++    const raw = window.localStorage.getItem(COMPLETED_KEY);
++    const parsed = raw ? JSON.parse(raw) : null;
++    return parsed && typeof parsed === "object" && parsed.region ? parsed : null;
++  } catch (e) {
++    return null;
++  }
++}
++export function clearCompletedOnboarding() {
++  try {
++    if (typeof window === "undefined") return;
++    window.localStorage.removeItem(COMPLETED_KEY);
++  } catch (e) {
++    /* ignore */
++  }
++}
++
+ // ============================================================
+ // (참고) 국민체력100 기록 제출은 이제 components/CertChallenge.jsx에서
+ // 서버 응답 에러 메시지를 직접 다루기 위해 fetch를 인라인으로 호출함.
